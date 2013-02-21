@@ -25,7 +25,7 @@ r = N;
 c = 2;
 
 
-set(plot_panel,'Position',[0.18076477404403243,0.0,0.7833140208574739,1.0]);
+set(plot_panel,'Position',[0.18076477404403243,0.0,0.7,1]);
 % pw = 300; % panel width including margin in pixels
 % ph = 50; % panel height including margin in pixels
 % mb = 20; % bottom margin
@@ -37,7 +37,7 @@ set(plot_panel,'Position',[0.18076477404403243,0.0,0.7833140208574739,1.0]);
 % fig_size = [0, 0,  pw*c + 100, ph*r + mb+mt + 50]'; % size of figure window
 % pos_fig = [100,100,0,0]' + fig_size; % position of figure
 
-scaling = r/4;
+scaling = r/3.8;
 
 
 if scaling > 1

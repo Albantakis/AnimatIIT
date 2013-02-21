@@ -1,5 +1,13 @@
 function [phi prob prob_prod_MIP MIP network] = phi_comp_ex(subsystem,numerator,whole_sys_state,subsets_subsys,network)
 %% compute small phi for a purview
+op_extNodes = network.options(11);
+
+if op_extNodes == 0
+    extNodes = setdiff(network.full_system, subsystem);
+else
+    extNodes = [];
+end   
+
 num_nodes_subsys = length(subsystem);
 num_states_subsys = prod([network.nodes([subsystem]).num_states]);
    
@@ -14,10 +22,10 @@ for i=1: num_states_subsys-1
     if nnz(sum(network.connect_mat(numerator,denom),1) == 0) > 0 % some denom is not input of numerator (numerator) --> no phiBR
         if nnz(sum(network.connect_mat(denom,numerator),2) == 0) == 0 % but denom is output
             [phi_MIP(i,:) prob_cand{i} prob_prod_MIP_cand{i} MIP_cand{i} network] ...
-                = phi_comp_bORf(numerator,denom,whole_sys_state,network,2);
+                = phi_comp_bORf(subsystem,numerator,denom,whole_sys_state,network,2);
         else
             uniform_dist = ones(num_states_subsys,1)/num_states_subsys; % for BR uniform maxent, for FR forward maxent
-            forward_maxent_dist = comp_pers_cpt(network.nodes,[],subsystem,[],'forward');
+            forward_maxent_dist = comp_pers_cpt(network.nodes,[],subsystem,whole_sys_state,'forward', extNodes);
             prob_cand{i} = {uniform_dist; forward_maxent_dist(:)};
             prob_prod_MIP_cand{i} = cell(2,1);
             MIP_cand{i} = cell(2,2,2);
@@ -25,7 +33,7 @@ for i=1: num_states_subsys-1
     else
         if nnz(sum(network.connect_mat(denom,numerator),2) == 0) > 0 % denom is not output, but denom is input
             [phi_MIP(i,:) prob_cand{i} prob_prod_MIP_cand{i} MIP_cand{i} network] ...
-                = phi_comp_bORf(numerator,denom,whole_sys_state,network,1); 
+                = phi_comp_bORf(subsystem,numerator,denom,whole_sys_state,network,1); 
         else % denom is both
             [phi_MIP(i,:) prob_cand{i} prob_prod_MIP_cand{i} MIP_cand{i} network] ...
                 = phi_comp_bf(subsystem,numerator,denom,denom,whole_sys_state,network); 
@@ -67,7 +75,7 @@ for i = 1:2
         denom = xf;
         if length(denom) ~= num_nodes_subsys 
             denom_rest = pick_rest(subsystem,denom);
-            fmaxent_denom_rest = comp_pers_cpt(network.nodes,[],denom_rest,[],'forward');
+            fmaxent_denom_rest = comp_pers_cpt(network.nodes,[],denom_rest,whole_sys_state,'forward',extNodes);
             prob{i} = expand_prob_general(prob{i},subsystem,denom,fmaxent_denom_rest(:));
             prob_prod_MIP{i} = expand_prob_general(prob_prod_MIP{i},subsystem,denom,fmaxent_denom_rest(:));
         end

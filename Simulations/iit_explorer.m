@@ -22,7 +22,7 @@ function varargout = iit_explorer(varargin)
 
 % Edit the above text to modify the response to help iit_explorer
 
-% Last Modified by GUIDE v2.5 31-Jan-2013 18:16:43
+% Last Modified by GUIDE v2.5 20-Feb-2013 14:54:00
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -178,25 +178,30 @@ if strcmp(view,'Overview')
     set(handles.big_phi_MIP_text,'String',['Big Phi MIP = ' num2str(handles.data.Big_phi_MIP{state_index}(subset_index))])
     set(handles.MIP_text,'String',{'MIP:',[mod_mat2str(handles.data.complex_MIP_M{state_index}{subset_index}) '-'...
                                             mod_mat2str(pick_rest(subset,handles.data.complex_MIP_M{state_index}{subset_index}))]})
-    set(handles.sum_small_phi_text,'String',['Sum Small Phi = ' num2str(sum(handles.data.small_phi_M{state_index}{subset_index}(:,1)))])
-    set(handles.num_core_concepts_text,'String',['# Core Concepts = ' num2str(sum(handles.data.small_phi_M{state_index}{subset_index}(:,1) ~= 0))])
-
-    [IRR_REP IRR_phi IRR_MIP M_IRR] = IRR_points(handles.data.concepts_M{state_index},...
-                                                 handles.data.small_phi_M{state_index},...
-                                                 handles.data.concept_MIP_M{state_index},subset, subset_index);
-
-
-                                           
-    if handles.export_plot
-        figure_handle = figure;
-        panel = uipanel('Parent',figure_handle);
-        set(handles.export_plot_button,'BackgroundColor',[0.9294    0.9294    0.9294]);
+    if handles.data.BFCut_M{state_index}{subset_index} == 1
+        BFCutString = '<-- BR cut';
     else
-        panel = handles.overview_axes_panel;
+        BFCutString = '--> FR cut';
+    end    
+    set(handles.BFCut_text,'String',{'Cut direction:',BFCutString})
+    if ~isempty(handles.data.purviews_M{state_index}{subset_index}) %Should not happen, but just in case
+        set(handles.sum_small_phi_text,'String',['Sum Small Phi = ' num2str(sum(handles.data.small_phi_M{state_index}{subset_index}(:,1)))])
+        set(handles.num_core_concepts_text,'String',['# Core Concepts = ' num2str(sum(handles.data.small_phi_M{state_index}{subset_index}(:,1) ~= 0))])
+
+        [IRR_REP IRR_phi IRR_MIP M_IRR] = IRR_points(handles.data.concepts_M{state_index},...
+                                                     handles.data.small_phi_M{state_index},...
+                                                     handles.data.concept_MIP_M{state_index},subset, subset_index);
+        if handles.export_plot
+            figure_handle = figure;
+            panel = uipanel('Parent',figure_handle);
+            set(handles.export_plot_button,'BackgroundColor',[0.9294    0.9294    0.9294]);
+        else
+            panel = handles.overview_axes_panel;
+        end
+
+        plot_REP(handles.data.Big_phi_M{state_index}(subset_index), IRR_REP, IRR_phi, IRR_MIP,...
+                                            subset, panel)
     end
-    
-    plot_REP(handles.data.Big_phi_M{state_index}(subset_index), IRR_REP, IRR_phi, IRR_MIP,...
-                                        subset, panel)
 	% reset export_panel flag
     handles.export_plot = 0;
     guidata(hObject,handles);
@@ -385,7 +390,7 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-
+%Larissa
 % --- Executes on button press in refresh_subset_button.
 function refresh_subset_button_Callback(hObject, eventdata, handles)
 % hObject    handle to refresh_subset_button (see GCBO)
@@ -395,11 +400,22 @@ function refresh_subset_button_Callback(hObject, eventdata, handles)
 [handles.data.subset handles.data.subset_index handles.data.state_index] = get_subset_and_state(handles);
 guidata(gcf,handles)
 
+subset_index = handles.data.subset_index;
 state_index = handles.data.state_index;
 
-if isempty(handles.data.Complex{state_index})
+if isempty(nnz(cell2mat(handles.data.BFCut_M{1})))
     set(handles.overview_axes_panel,'Visible','off')
-    set(handles.overview_axes_text,'String','This state in not realizable','Visible','on')
+    set(handles.overview_axes_text,'String','This state in not realizable.','Visible','on')
+    return
+end
+
+if isempty(handles.data.purviews_M{state_index}{subset_index})
+    set(handles.overview_axes_panel,'Visible','off')
+    if handles.data.network.options(3)==0
+        set(handles.overview_axes_text,'String','Only the full complex was calculated.','Visible','on')
+    else
+        set(handles.overview_axes_text,'String','This set of elements is not strongly connected or has no concepts.','Visible','on')
+    end
     return
 end
 
@@ -419,11 +435,17 @@ set(handles.partition_list,'Value',MIP_index)
 
 
 
-%Larissa: This still needs to be checked if quali plot is correct!
+%Larissa: This still needs to be checked if qualia plot is correct!
 function plot_partition(handles)
 
 subset = handles.data.subset; subset_index = handles.data.subset_index;
 state_index = handles.data.state_index;
+
+if isempty(handles.data.purviews_M{state_index}{subset_index})
+    set(handles.mip_plot_panel,'Visible','off')
+    set(handles.partition_plot_info,'String','This set of elements is not strongly connected or has no concepts.','Visible','on')
+    return
+end
 
 [partition1 partition1_index partition2 partition2_index] = get_partitions(handles);
 
@@ -455,7 +477,10 @@ end
 direction_choices = get(handles.past_future_list,'String');
 direction_text = ['Temporal Direction: ' direction_choices{get(handles.past_future_list,'Value')}];
 
-partition_info = {system_partition_text, big_phi_partition_text, selected_concepts_text, direction_text};
+Cutdirection_choices = get(handles.BFCut_list,'String');
+Cutdirection_text = ['Cut Direction: ' Cutdirection_choices{get(handles.BFCut_list,'Value')}];
+
+partition_info = {system_partition_text, big_phi_partition_text, selected_concepts_text, direction_text, Cutdirection_text};
 
 set(handles.partition_plot_info,'String',partition_info)
 
@@ -471,68 +496,16 @@ set(handles.mip_plot_panel,'Visible','off')
 
 drawnow
 
-% get phi values for the whole
-w_phi_all = handles.data.small_phi_M{state_index}{subset_index}(:,1)';
-w_phi_concepts = w_phi_all(w_phi_all ~= 0);
-%     IRR_whole = M_IRR_M{whole_i};
-
-
-% get concepts for the whole
-w_concept_dists_p = zeros(2^N,length(w_phi_concepts));
-w_concept_dists_f = zeros(2^N,length(w_phi_concepts));
-
-z = 1;
-for i = 1:length(w_phi_all)
-    if (w_phi_all(i) ~= 0)
-
-        if ~isempty(handles.data.concepts_M{state_index}{subset_index,1}{i}{1})
-            w_concept_dists_p(:,z) = handles.data.concepts_M{state_index}{subset_index,1}{i}{1};
-        end
-        if ~isempty(handles.data.concepts_M{state_index}{subset_index,1}{i}{2})
-            w_concept_dists_f(:,z) = handles.data.concepts_M{state_index}{subset_index,1}{i}{2};
-        end
-        z = z + 1;
-    end
-end  
-
-parts_phi_all = [handles.data.small_phi_M{state_index}{partition1_index}(:,1)' ...
-                      handles.data.small_phi_M{state_index}{partition2_index}(:,1)'];
-
-nIRR = sum(parts_phi_all ~= 0);
-
-p_concept_dists_p = zeros(2^N,nIRR);
-p_concept_dists_f = zeros(2^N,nIRR);
-parts_phi_concepts = parts_phi_all(parts_phi_all ~= 0);
-
-z = 1;
-for k = 1:length(parts_phi_all)
-
-    if (parts_phi_all(k) ~= 0)
-        %we could change the if below to check against k instead...
-        if(z <= sum(handles.data.small_phi_M{state_index}{partition1_index}(:,1) ~= 0))
-            p_concept_dists_p(:,z) = expand_prob(handles.data.concepts_M{state_index}{partition1_index,1}{k}{1},subset,partition1);
-            
-            partition_rest = pick_rest(subset,partition1);
-            fmaxent_rest = comp_pers_cpt(handles.data.network.nodes,[],partition_rest,[],'forward');                       
-            p_concept_dists_f(:,z) = expand_prob_general(handles.data.concepts_M{state_index}{partition1_index,1}{k}{2},subset,partition1,fmaxent_rest(:));
-        else
-            k_offset = k - size(handles.data.small_phi_M{state_index}{partition1_index},1);
-            p_concept_dists_p(:,z) = ...
-                expand_prob(handles.data.concepts_M{state_index}{partition2_index,1}{k_offset}{1},subset,partition2);
-            
-            partition_rest = pick_rest(subset,partition2);
-            fmaxent_rest = comp_pers_cpt(handles.data.network.nodes,[],partition_rest,[],'forward');                       
-            p_concept_dists_f(:,z) = expand_prob_general(handles.data.concepts_M{state_index}{partition2_index,1}{k_offset}{2},subset,partition2,fmaxent_rest(:));
-        end
-        z = z + 1;
-
-    end
-
-end
-
+[w_concept_dists_p w_concept_dists_f w_phi_concepts p_concept_dists_p p_concept_dists_f parts_phi_concepts] = plot_PHI_Cut_concepts(subset, partition1, get(handles.BFCut_list,'Value'),...
+                                                            handles.data.purviews_M{state_index},handles.data.concepts_M{state_index}, handles.data.small_phi_M{state_index},...
+                                                            handles.data.concept_MIP_M{state_index}, handles.data.network);
 plot_choices = get(handles.partition_plot_menu,'String');
 plot_choice_index = get(handles.partition_plot_menu,'Value');
 plot_choice = plot_choices{plot_choice_index};
+
+%Larissa: it would be nice if we also had phi_back and phi_future for the
+%cut system
+all_phi = [w_phi_concepts; parts_phi_concepts];
 
 if get(handles.past_future_list,'Value') == 1
     all_concepts = [w_concept_dists_p'; p_concept_dists_p'];
@@ -540,20 +513,8 @@ else
     all_concepts = [w_concept_dists_f'; p_concept_dists_f'];
 end
 
-part1_purviews = handles.data.purviews_M{state_index}{partition1_index};
-part2_purviews = handles.data.purviews_M{state_index}{partition2_index};
-n_part_purviews = length(part1_purviews)+length(part2_purviews);
-part_purviews = cell(n_part_purviews,1);
-
-for i = 1:n_part_purviews
-
-    if i <= length(part1_purviews)
-        part_purviews{i} = part1_purviews{i};
-    else
-        part_purviews{i} = part2_purviews{i - length(part1_purviews)};
-    end
-
-end
+%Larissa: For the moment all (Before it was only the ones that still exist)
+part_purviews = handles.data.purviews_M{state_index}{subset_index};
 
 % options for plot view
 
@@ -582,7 +543,7 @@ if strcmp(plot_choice,'3D & 2D Scatter')
     
     set(handles.partition_panel_slider,'Visible','off')
     conceptscatter3D2D(all_concepts,size(w_concept_dists_p,2), handles.data.purviews_M{state_index}{subset_index},...
-            part_purviews, highlight_indices, panel, '2D3D', dim_choice);
+            part_purviews, highlight_indices, panel, '2D3D', dim_choice, all_phi);
         
 	handles.export_plot = 0;
     guidata(handles.iit_explorer,handles);
@@ -601,7 +562,7 @@ elseif strcmp(plot_choice,'3D Scatter')
     
     set(handles.partition_panel_slider,'Visible','off')
     conceptscatter3D2D(all_concepts,size(w_concept_dists_p,2), handles.data.purviews_M{state_index}{subset_index},...
-            part_purviews, highlight_indices, panel, '3D',dim_choice);
+            part_purviews, highlight_indices, panel, '3D',dim_choice, all_phi);
         
 	handles.export_plot = 0;
     guidata(handles.iit_explorer,handles);
@@ -626,7 +587,7 @@ elseif strcmp(plot_choice,'2D Scatter')
     
     set(handles.partition_panel_slider,'Visible','off')
     conceptscatter3D2D(all_concepts,size(w_concept_dists_p,2), handles.data.purviews_M{state_index}{subset_index},...
-            part_purviews, highlight_indices, panel, '2D',dim_choice);  
+            part_purviews, highlight_indices, panel, '2D',dim_choice, all_phi);  
         
 	handles.export_plot = 0;
     guidata(handles.iit_explorer,handles);
@@ -833,9 +794,8 @@ for i = 1:length(concept_indices)
     end
 
 end
-
-
-plot_partition(handles);
+% Larissa: This doesn't work right now
+%plot_partition(handles);
 
 function [subset subset_index state_index] = get_subset_and_state(handles)
 
@@ -889,24 +849,28 @@ subset_index = handles.data.subset_index;
 state_index = handles.data.state_index;
 [ignore_var partition1_index ignore_var partition2_index] = get_partitions(handles);
 
+%Larissa: For the moment show all, even the partitioned with phi = 0
 num_concepts_whole = length(handles.data.purviews_M{state_index}{subset_index,1});
-num_concepts_part1 = length(handles.data.purviews_M{state_index}{partition1_index,1});
-num_concepts_part2 = length(handles.data.purviews_M{state_index}{partition2_index,1});
-num_concepts = num_concepts_whole + num_concepts_part1 + num_concepts_part2;
-             
+%num_concepts_part1 = length(handles.data.purviews_M{state_index}{partition1_index,1});
+%num_concepts_part2 = length(handles.data.purviews_M{state_index}{partition2_index,1});
+%num_concepts = num_concepts_whole + num_concepts_part1 + num_concepts_part2;
+num_concepts = 2*num_concepts_whole;
+
 concept_names = cell(num_concepts,1);
 
 for i = 1:num_concepts_whole
     concept_names{i} = [mod_mat2str(handles.data.purviews_M{state_index}{subset_index}{i}) '_whole'];
 end
-
-for i = num_concepts_whole + 1 : num_concepts_whole + num_concepts_part1
-    concept_names{i} = [mod_mat2str(handles.data.purviews_M{state_index}{partition1_index}{i-num_concepts_whole}) '_part1'];
+for i = 1:num_concepts_whole
+    concept_names{num_concepts_whole+i} = [mod_mat2str(handles.data.purviews_M{state_index}{subset_index}{i}) '_part'];
 end
-
-for i = num_concepts_whole + num_concepts_part1 + 1:num_concepts
-    concept_names{i} = [mod_mat2str(handles.data.purviews_M{state_index}{partition2_index}{i-num_concepts_part1-num_concepts_whole}) '_part1'];
-end
+% for i = num_concepts_whole + 1 : num_concepts_whole + num_concepts_part1
+%     concept_names{i} = [mod_mat2str(handles.data.purviews_M{state_index}{partition1_index}{i-num_concepts_whole}) '_part1'];
+% end
+% 
+% for i = num_concepts_whole + num_concepts_part1 + 1:num_concepts
+%     concept_names{i} = [mod_mat2str(handles.data.purviews_M{state_index}{partition2_index}{i-num_concepts_part1-num_concepts_whole}) '_part1'];
+% end
 
 set(handles.purviews_list,'String',concept_names)
 set(handles.purviews_list,'Value',[]);
@@ -984,3 +948,26 @@ function Untitled_1_Callback(hObject, eventdata, handles)
 % hObject    handle to Untitled_1 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on selection change in BFCut_list.
+function BFCut_list_Callback(hObject, eventdata, handles)
+% hObject    handle to BFCut_list (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns BFCut_list contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from BFCut_list
+
+
+% --- Executes during object creation, after setting all properties.
+function BFCut_list_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to BFCut_list (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: listbox controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end

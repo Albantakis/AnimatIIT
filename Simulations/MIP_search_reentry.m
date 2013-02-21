@@ -12,15 +12,21 @@ op_small_phi = options(4);
 op_big_phi = options(5);
 op_normalize = options(7);
 op_console = options(8);
-op_removal = options(11);
+op_extNodes = options(11);
 
 N_M = length(subsystem);
 
-if op_removal == 0 && N ~= length(subsystem)
+if op_extNodes == 1 && N ~= length(subsystem)
     M = 1:length(subsystem);
 else
     M = subsystem;
 end  
+
+if op_extNodes == 0
+    extNodes = setdiff(network.full_system, subsystem);
+else
+    extNodes = [];
+end 
 
 
 C = [];
@@ -57,7 +63,7 @@ for j = 1:N_Bp
 
     M1_i = subsystem2index(M1);
     M2_i = subsystem2index(M2);  
-
+   
     %Big_phi_partition = Big_phi_M(M1_i) + Big_phi_M(M2_i);
     PhiCutSum = [0; 0];  %Larissa: cutting first M1 <- M2 (causes on M1, effects from M2) and then M1 -> M2 (causes on M2, effects from M1)
     if op_big_phi ~= 0
@@ -70,7 +76,7 @@ for j = 1:N_Bp
         IRR_w = IRR_whole{k};
         if all(ismember(IRR_w,M1)) 
             % for M1 <- M2 cut take BR of M1 and FR from M
-            if op_removal == 0 || isempty(prob_M{M1_i,1})
+            if op_extNodes < 2 || isempty(prob_M{M1_i,1})
                 % need to compute R/Rf for BRcut and R/Rb for FRcut
                 [phi_BRcut_BR, cutpdist, denom_pnew, network] = phi_comp_ex_unidir(M,M1,M2,IRR_w,network.current_state,network,'backward','BRcut');
                 [phi_FRcut_FR, cutfdist, denom_fnew, network] = phi_comp_ex_unidir(M,M1,M2,IRR_w,network.current_state,network,'forward','FRcut');
@@ -88,7 +94,7 @@ for j = 1:N_Bp
 
                     cutpdist = expand_prob(prob_M{M1_i,1}{indm}{1},M,M1);
                     %compute the max ent forward dist (or the marginal forward) of M2
-                    forward_max_ent_M2 = comp_pers_cpt(network.nodes,[],M2,[],'forward');
+                    forward_max_ent_M2 = comp_pers_cpt(network.nodes,[],M2,network.current_state,'forward',extNodes);
                     cutfdist = expand_prob_general(prob_M{M1_i,1}{indm}{2},M,M1,forward_max_ent_M2(:));               
                 end                       
             end    
@@ -103,7 +109,7 @@ for j = 1:N_Bp
             end    
         elseif all(ismember(IRR_w,M2))
             
-            if op_removal == 0 || isempty(prob_M{M2_i,1})
+            if op_extNodes < 2 || isempty(prob_M{M2_i,1})
                 % need to compute R/Rf for BRcut and R/Rb for FRcut
                 [phi_BRcut_FR, cutfdist, denom_pnew, network] = phi_comp_ex_unidir(M,M1,M2,IRR_w,network.current_state,network,'forward','BRcut');
                 [phi_FRcut_BR, cutpdist, denom_fnew, network] = phi_comp_ex_unidir(M,M1,M2,IRR_w,network.current_state,network,'backward','FRcut');
@@ -116,7 +122,7 @@ for j = 1:N_Bp
                 phi_FRcut = min(phi_M{M2_i}(indm,2), phi_M{whole_i}(concept_numind(k),3));
                 if op_big_phi ~= 0 %L1 or Earthmover
                     %compute the max ent forward dist (or the marginal forward) of M1
-                    forward_max_ent_M1 = comp_pers_cpt(network.nodes,[],M1,[],'forward');
+                    forward_max_ent_M1 = comp_pers_cpt(network.nodes,[],M1,network.current_state,'forward',extNodes);
                     cutfdist = expand_prob_general(prob_M{M2_i,1}{indm}{2},M,M2,forward_max_ent_M1(:));
                     cutpdist = expand_prob(prob_M{M2_i,1}{indm}{1},M,M2); 
                 end   
@@ -226,7 +232,7 @@ for j = 1:N_Bp
         
     elseif op_big_phi == 1
         back_maxent = expand_prob([],M,[]);
-        forward_maxent = comp_pers_cpt(network.nodes,[],M,[],'forward');
+        forward_maxent = comp_pers_cpt(network.nodes,[],M,network.current_state,'forward',extNodes);
         forward_maxent = forward_maxent(:);
 
         BRcut_Phi = 0;
@@ -248,7 +254,7 @@ for j = 1:N_Bp
           
     elseif op_big_phi == 2  %earth movers for concepts
         back_maxent = expand_prob([],M,[]);
-        forward_maxent = comp_pers_cpt(network.nodes,[],M,[],'forward');
+        forward_maxent = comp_pers_cpt(network.nodes,[],M,network.current_state,'forward',extNodes);
         forward_maxent = forward_maxent(:);
         
 %             indBR = find(BRcut_phi);
@@ -315,7 +321,7 @@ for j = 1:N_Bp
     Big_phi_cand(l,1) = d_Big_phi;
     Big_phi_cand(l,2) = d_Big_phi/Norm;
     
-    if op_removal == 0 && N ~= length(subsystem)
+    if op_extNodes == 1 && N ~= length(subsystem)
         MIP_cand{l} = subsystem(M1);
     else
         MIP_cand{l} = M1;

@@ -26,7 +26,7 @@ p_InStates = InStates_distr./size(Input_vec,1);
 Input_O2 = [Input_vec(1:end-1,:), Input_vec(2:end,:)];
 [InStatesO2, inR, inMapO2] = unique(Input_O2, 'rows', 'First');
 InStates_distrO2 = hist(inMapO2, 1:size(InStatesO2,1))';
-p_InStates = InStates_distrO2./size(Input_O2,1);
+p_InStatesO2 = InStates_distrO2./size(Input_O2,1);
 
 %% Internal state distribution
 Life_tpm = Life_tpm.data(:,10:17);

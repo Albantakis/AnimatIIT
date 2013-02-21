@@ -1,5 +1,5 @@
 function [ax, height, extra_plots] = conceptscatter3D2D(x,nWholeConcepts, whole_purviews, part_purviews,...
-                                            highlight_indices, parent_panel, view_option, dim_option)
+                                            highlight_indices, parent_panel, view_option, dim_option, all_phi)
 % BASED ON GPLOTMATRIX
 
 
@@ -94,12 +94,16 @@ if any(strcmp(view_option,{'2D','2D3D'}))
                 state1 = state_ordering(i);
                 state2 = state_ordering(j);
 
-
-                plot(ax{ax_index},part(:,state2), ...
-                    part(:,state1),'dr','Clipping','on');
-%                 text(part(p_nonhighlight_indices,state2),part(p_nonhighlight_indices,state1),part_nonselected_labels)
-                hold on;
-
+                for l = 1:nWholeConcepts
+                    if all_phi(2,l)==0
+                        color = [.5 .5 .5];
+                    else
+                        color = [1, 0, 0];
+                    end    
+                    plot(ax{ax_index},part(l,state2),part(l,state1),'d','color',color,'Clipping','on');
+                    %text(part(p_nonhighlight_indices,state2),part(p_nonhighlight_indices,state1),part_nonselected_labels)
+                    hold on;
+                end
 
                 plot(ax{ax_index},whole(w_nonhighlight_indices,state2),...
                     whole(w_nonhighlight_indices,state1),'*b','Clipping','on')
@@ -110,8 +114,7 @@ if any(strcmp(view_option,{'2D','2D3D'}))
                     whole(w_highlight_indices,state1),'og','MarkerSize',8,'Clipping','on');
                 hold on;
 
-                plot(ax{ax_index},part(p_highlight_indices,state2), ...
-                    part(p_highlight_indices,state1),'og','MarkerSize',8,'Clipping','on');
+                plot(ax{ax_index},part(p_highlight_indices,state2), part(p_highlight_indices,state1),'og','MarkerSize',8,'Clipping','on');
                 hold on;
 
                 choices = nchoosek([1 2 3],2);
@@ -164,11 +167,16 @@ if any(strcmp(view_option,{'3D','2D3D'}))
 
     ax{ax_index} = axes3D;
 
-
-    scatter3(ax{ax_index},part(:,state_ordering(1)),part(:,state_ordering(2)),...
-        part(:,state_ordering(3)),'Marker','d','MarkerEdgeColor','r','SizeData',75,'Clipping','on')
-    hold on
-
+    for l = 1:nWholeConcepts
+        if all_phi(2,l)==0
+            color = [.5 .5 .5];
+        else
+            color = [1, 0, 0];
+        end   
+        scatter3(ax{ax_index},part(l,state_ordering(1)),part(l,state_ordering(2)),...
+            part(l,state_ordering(3)),'Marker','d','MarkerEdgeColor',color,'SizeData',75,'Clipping','on')
+        hold on
+    end
     scatter3(ax{ax_index},whole(:,state_ordering(1)),whole(:,state_ordering(2)),...
         whole(:,state_ordering(3)),'Marker','*','MarkerEdgeColor','b','SizeData',75,'Clipping','on')
 

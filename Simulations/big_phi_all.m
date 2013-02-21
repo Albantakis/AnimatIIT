@@ -3,7 +3,7 @@ function [Big_phi_M phi_M prob_M subsets MIP_M M_IRR_M network MIP_M_subsys] = b
 op_console = network.options(8);
 op_parfor = network.options(9); % used by Animat program
 op_strongconn = network.options(10);
-op_removal = network.options(11);
+op_extNodes = network.options(11);
 
 N = network.num_nodes; % number of elements in the whole system
 nodes_vec = network.full_system;
@@ -27,6 +27,15 @@ M_IRR_M = cell(network.num_states-1,1);
 removal_networks = cell(network.num_states-1,1); 
 MIP_M_subsys = cell(network.num_states-1,1); % only used for removals
 
+if op_parfor == 2 && op_extNodes == 0
+    network.BRs = cell(network.num_states-1,1); % backward repertoire
+    network.FRs = cell(network.num_states-1,1); % forward repertoire
+    for i = 1:network.num_states-1
+        network.BRs{i} = cell(network.num_subsets); %In principle this could be smaller, but then the indexing gets more complicated later. So now we keep it full system size.
+        network.FRs{i} = cell(network.num_subsets);
+    end    
+end
+
 % With parfor it's probably faster for a single simulation, if many simulations are run in parallel,
 % then it's better to do the for loop which enables the back-passing of network, so BR and FR don't 
 % have to be calculated in each loop and the Complex Search can later access
@@ -40,7 +49,7 @@ if op_parfor == 1
             PotIrrComplex = 1;
         end    
         if PotIrrComplex == 1
-            if op_removal == 0 && N ~= numel(this_subset)
+            if op_extNodes == 1 && N ~= numel(this_subset)
                 %Put an extra thing into network with the new connectivity
                 %matrices and the new nodes for each subset
                 removal_networks{sub_index} = cpt_removal_network(this_subset,network);
@@ -66,7 +75,7 @@ else
             PotIrrComplex = 1;
         end  
         if PotIrrComplex == 1
-            if op_removal == 0 && N ~= numel(this_subset)
+            if op_extNodes == 1 && N ~= numel(this_subset)
                 %Put an extra thing into network with the new connectivity
                 %matrices and the new nodes for each subset
                 removal_networks{sub_index} = cpt_removal_network(this_subset,network);
@@ -86,7 +95,7 @@ else
     end
 end
 
-if op_removal == 0 
+if op_extNodes == 1 
     network.removal_networks = removal_networks;
 end
 %% display

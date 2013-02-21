@@ -1,8 +1,13 @@
-function [CutDistr] = PHI_Cut_concepts(M,MIP,BFCut,M_IRR_M,prob_M, phi_M,concept_MIP_M, network)
-%%
-% Recompute distributrions of PHI cut
-%%
-op_strongconn = network.options(10);
+function [PastDistr FutDistr phi_w_concepts CutPastDistr CutFutDistr CutPhi] = plot_PHI_Cut_concepts(M,MIP,BFCut,M_IRR_M,prob_M, phi_M,concept_MIP_M, network)
+
+op_extNodes = network.options(11);
+
+if op_extNodes == 0
+    extNodes = setdiff(network.full_system, M);
+else
+    extNodes = [];
+end  
+
 whole_i = subsystem2index(M);     % Full system index
 
 phi_whole = phi_M{whole_i}(:,1)';
@@ -20,19 +25,30 @@ if BFCut == 1 %M1 <- M2 is cut
     BRcut_dist = cell(length(phi_w_concepts), 2, 2); %dim1: per concept, dim2: past/future, dim2: whole/cut
     for k = 1:length(phi_w_concepts)
         IRR_w = IRR_whole{k};
-        if all(ismember(IRR_w,M1)) && op_strongconn ~= 0 %~isempty(prob_M{M1_i,1})
+        if all(ismember(IRR_w,M1)) 
             % for M1 <- M2 cut take BR of M1 and FR from M
-            indm = concept2index(IRR_w,M1);
-            cutpdist = expand_prob(prob_M{M1_i,1}{indm}{1},M,M1);
+            if op_extNodes < 2 || isempty(prob_M{M1_i,1})
+                % need to compute R/Rf for BRcut and R/Rb for FRcut
+                [phi_BRcut_BR, cutpdist, denom_pnew, network] = phi_comp_ex_unidir(M,M1,M2,IRR_w,network.current_state,network,'backward','BRcut');
+                phi_cut = min(phi_BRcut_BR, phi_M{whole_i}(concept_numind(k),3));
+            else            
+                indm = concept2index(IRR_w,M1);
+                phi_cut = min(phi_M{M1_i}(indm,2), phi_M{whole_i}(concept_numind(k),3));
+                cutpdist = expand_prob(prob_M{M1_i,1}{indm}{1},M,M1);
+            end    
             BRcut_dist(k,1,:) = {prob_M{whole_i,1}{concept_numind(k)}{1} cutpdist};
             BRcut_dist(k,2,:) = {prob_M{whole_i,1}{concept_numind(k)}{2} prob_M{whole_i,1}{concept_numind(k)}{2}}; 
-        elseif all(ismember(IRR_w,M2))  && op_strongconn ~= 0 % ~isempty(prob_M{M2_i,1})
-            indm = concept2index(IRR_w,M2);
-            %Larissa: distributions that are identical anyways
-
-            %compute the max ent forward dist (or the marginal forward) of M1
-            forward_max_ent_M1 = comp_pers_cpt(network.nodes,[],M1,[],'forward');
-            cutfdist = expand_prob_general(prob_M{M2_i,1}{indm}{2},M,M2,forward_max_ent_M1(:));
+        elseif all(ismember(IRR_w,M2))
+            if op_extNodes < 2 || isempty(prob_M{M2_i,1})
+                [phi_BRcut_FR, cutfdist, denom_pnew, network] = phi_comp_ex_unidir(M,M1,M2,IRR_w,network.current_state,network,'forward','BRcut');
+                phi_cut = min(phi_M{whole_i}(concept_numind(k),2), phi_BRcut_FR);
+            else          
+                indm = concept2index(IRR_w,M2);
+                phi_cut = min(phi_M{whole_i}(concept_numind(k),2), phi_M{M2_i}(indm,3));
+                %compute the max ent forward dist (or the marginal forward) of M1
+                forward_max_ent_M1 = comp_pers_cpt(network.nodes,[],M1,network.current_state,'forward');
+                cutfdist = expand_prob_general(prob_M{M2_i,1}{indm}{2},M,M2,forward_max_ent_M1(:));
+            end    
             BRcut_dist(k,1,:) = {prob_M{whole_i,1}{concept_numind(k)}{1} prob_M{whole_i,1}{concept_numind(k)}{1}}; %back is the same
             BRcut_dist(k,2,:) = {prob_M{whole_i,1}{concept_numind(k)}{2} cutfdist}; %future might have changed
         else % if numerator has elements from both sides
@@ -58,7 +74,7 @@ if BFCut == 1 %M1 <- M2 is cut
                     [phi_BRcut_FR, BRcut_fdist, denom_fnew, network] = phi_comp_ex_unidir(M,M1,M2,IRR_w,network.current_state,network,'forward','BRcut');
                 end    
             end
-
+            phi_cut = min(phi_BRcut_BR, phi_BRcut_FR);
             if ~isempty(BRcut_pdist)
                 BRcut_dist(k,1,:) = {prob_M{whole_i,1}{concept_numind(k)}{1} BRcut_pdist};
             else    
@@ -70,6 +86,7 @@ if BFCut == 1 %M1 <- M2 is cut
                 BRcut_dist(k,2,:) = {prob_M{whole_i,1}{concept_numind(k)}{2} prob_M{whole_i,1}{concept_numind(k)}{2}};
             end
         end % if 
+        CutPhi(k) = phi_cut;
     end %for k    
     CutDistr = BRcut_dist;
 else %M1 -> M2 is cut
@@ -77,19 +94,29 @@ else %M1 -> M2 is cut
     for k = 1:length(phi_w_concepts)
         IRR_w = IRR_whole{k};
         if all(ismember(IRR_w,M1)) 
-            % for M1 <- M2 cut take BR of M1 and FR from M
-            indm = concept2index(IRR_w,M1);
-            %Larissa: distributions that are identical anyways are empty
-            %compute the max ent forward dist (or the marginal forward) of M2
-            forward_max_ent_M2 = comp_pers_cpt(network.nodes,[],M2,[],'forward');
-            cutfdist = expand_prob_general(prob_M{M1_i,1}{indm}{2},M,M1,forward_max_ent_M2(:)); 
+            if op_extNodes < 2 || isempty(prob_M{M1_i,1})
+                % need to compute R/Rf for BRcut and R/Rb for FRcut
+                [phi_FRcut_FR, cutfdist, denom_fnew, network] = phi_comp_ex_unidir(M,M1,M2,IRR_w,network.current_state,network,'forward','FRcut');
+                phi_cut = min(phi_M{whole_i}(concept_numind(k),2),phi_FRcut_FR);
+            else            
+                % for M1 <- M2 cut take BR of M1 and FR from M
+                indm = concept2index(IRR_w,M1);
+                phi_cut = min(phi_M{whole_i}(concept_numind(k),2), phi_M{M1_i}(indm,3));
+                %compute the max ent forward dist (or the marginal forward) of M2
+                forward_max_ent_M2 = comp_pers_cpt(network.nodes,[],M2,network.current_state,'forward');
+                cutfdist = expand_prob_general(prob_M{M1_i,1}{indm}{2},M,M1,forward_max_ent_M2(:)); 
+            end    
             FRcut_dist(k,1,:) = {prob_M{whole_i,1}{concept_numind(k)}{1} prob_M{whole_i,1}{concept_numind(k)}{1}}; 
             FRcut_dist(k,2,:) = {prob_M{whole_i,1}{concept_numind(k)}{2} cutfdist};
         elseif all(ismember(IRR_w,M2))
-            indm = concept2index(IRR_w,M2);
-            %Larissa: distributions that are identical anyways
-            %are empty for option 1
-            cutpdist = expand_prob(prob_M{M2_i,1}{indm}{1},M,M2); 
+            if op_extNodes < 2 || isempty(prob_M{M2_i,1})
+                [phi_FRcut_BR, cutpdist, denom_fnew, network] = phi_comp_ex_unidir(M,M1,M2,IRR_w,network.current_state,network,'backward','FRcut');
+                phi_cut = min(phi_FRcut_BR, phi_M{whole_i}(concept_numind(k),3));
+            else
+                indm = concept2index(IRR_w,M2);
+                phi_cut = min(phi_M{M2_i}(indm,2), phi_M{whole_i}(concept_numind(k),3));
+                cutpdist = expand_prob(prob_M{M2_i,1}{indm}{1},M,M2); 
+            end    
             FRcut_dist(k,1,:) = {prob_M{whole_i,1}{concept_numind(k)}{1} cutpdist}; %back might have changed, future is the same
             FRcut_dist(k,2,:) = {prob_M{whole_i,1}{concept_numind(k)}{2} prob_M{whole_i,1}{concept_numind(k)}{2}}; %back might have changed, future is the same
         else % if numerator has elements from both sides
@@ -117,7 +144,7 @@ else %M1 -> M2 is cut
                     [phi_FRcut_FR, FRcut_fdist, denom_fnew, network] = phi_comp_ex_unidir(M,M1,M2,IRR_w,network.current_state,network,'forward','FRcut');
                 end    
             end
-
+            phi_cut = min(phi_FRcut_BR, phi_FRcut_FR);
             if ~isempty(FRcut_pdist)
                 FRcut_dist(k,1,:) = {prob_M{whole_i,1}{concept_numind(k)}{1} FRcut_pdist};
             else
@@ -129,52 +156,12 @@ else %M1 -> M2 is cut
                 FRcut_dist(k,2,:) = {prob_M{whole_i,1}{concept_numind(k)}{2} prob_M{whole_i,1}{concept_numind(k)}{2}};
             end  
         end % if 
+        CutPhi(k) = phi_cut;
     end %for k 
     CutDistr = FRcut_dist;
 end
 
-%%
-figure
-L = length(CutDistr{1,1,1});
-rows = length(phi_w_concepts);
-states = convert(L);
-%title('[1]->[23]');
-for k = 1:rows
-    subplot(rows,2,2*k-1)
-        bar([CutDistr{k,1,1} CutDistr{k,1,2}])
-        axis([0.5 L+0.5 0 1])
-        set(gca,'XTick',1:L)
-        set(gca,'YTickLabel',[0 .5 1])
-        title(strcat(mat2str(IRR_whole{k}),'p'));
-        if k == rows
-            set(gca,'XTickLabel',num2str(states,'%d')) % uncomment this to have a binary valued x-axis
-            rotateXLabels( gca(), 90) % uncomment if binary values are used on the x-axis
-        else
-            set(gca,'XTickLabel',[]) 
-        end
-        
-    subplot(rows,2,2*k)
-        bar([CutDistr{k,2,1} CutDistr{k,2,2}])
-        axis([0.5 L+0.5 0 1])
-        set(gca,'XTick',1:L)
-        set(gca,'YTickLabel',[0 .5 1])
-        title(strcat(mat2str(IRR_whole{k}),'f'));
-
-        if k == rows
-            set(gca,'XTickLabel',num2str(states,'%d')) % uncomment this to have a binary valued x-axis
-            rotateXLabels( gca(), 90) % uncomment if binary values are used on the x-axis
-        else
-            set(gca,'XTickLabel',[]) 
-        end
-
-end    
-end
-
-%%
-function states = convert(N)
-states = zeros(N,log2(N));
-for i=1: N
-    sigma = trans2(i-1,log2(N));
-    states(i,:) = sigma';
-end
-end
+PastDistr = reshape(cell2mat(CutDistr(:,1,1)),2^(length(M)),[]);
+FutDistr = reshape(cell2mat(CutDistr(:,2,1)),2^(length(M)),[]);
+CutPastDistr = reshape(cell2mat(CutDistr(:,1,2)),2^(length(M)),[]);
+CutFutDistr = reshape(cell2mat(CutDistr(:,2,2)),2^(length(M)),[]);

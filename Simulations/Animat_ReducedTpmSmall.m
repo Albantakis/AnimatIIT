@@ -1,12 +1,12 @@
 function [tpm, used_nodes, RedStates] = Animat_ReducedTpmSmall(gen, APath, numSen, numMot, J)
 
-% NODES WITHOUT INPUTS OR OUTPUTS are taken out of the tpm
+% NODES WITHOUT INPUTS OR OUTPUTS (except sensors) are taken out of the tpm
 % NODES WITH ONLY OUTPUTS are set to 0 in animat program -> they shouldn't be
 % marginalized -> take them out of TPM
 % MOTORS are set to 0 after each step in the animat program
 % STRATEGY: leave motors in TPM but always use 00 state for them
-
-%TODO: change 8 to numNodes!
+% In principle, IIT with removals should take care of nodes without in, or
+% outputs, but previous exlusion doesn't hurt and might help speed
 
 if nargin < 5 %like in previous versions
     J = [];
@@ -15,11 +15,12 @@ if nargin < 5 %like in previous versions
     used_nodes = (unique(EdgeList)+1)'; 
 end
 
+numNodes = size(J,1);
+
 % Load Logic Table
 docname = strcat(APath, int2str(gen), '_FullLogicTable.txt');
 FullLogic = importdata(docname,',', 1);
-FullLogic = FullLogic.data(:,[1:8,10:17]);
-numNodes = size(FullLogic,2)/2;
+FullLogic = FullLogic.data(:,[1:numNodes,(numNodes+2):(2*numNodes+1)]);
 
 if ~isempty(J)
     %OnlyOut also finds nodes that have no input and output
@@ -41,7 +42,7 @@ indMot0 = 1:2^(numNodes-numMot); %Motors are always last in TPM
 tpm = repmat(FullLogic(indMot0,numNodes+(1:numNodes)),2^numMot,1);
 FullLogic = [FullLogic(:,1:numNodes), tpm];
 
-%Exclude Only Output Nodes
+%Exclude nodes with only in or outputs (only Outputs can be dangerous)
 excluded_nodes = setdiff(1:numNodes,used_nodes);
 %take TPM for all excluded elements = 0. 0 important for OnlyOut Nodes, for
 %not used nodes it wouldn't matter if 0 or 1 is used 

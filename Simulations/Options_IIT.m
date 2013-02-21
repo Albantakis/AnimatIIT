@@ -25,4 +25,7 @@ op_big_phi = network.options(5);
 op_normalize = network.options(6); % small phi
 op_normalize = options(7);         % big phi
 op_console = options(8);
-op_single = network.options(11);    % just needed for console output == 1
+op_parfor = network.options(9); % used by Animat program
+op_strongconn = network.options(10);
+op_extNodes = network.options(11);
+op_single = network.options(12);    % just needed for console output == 1

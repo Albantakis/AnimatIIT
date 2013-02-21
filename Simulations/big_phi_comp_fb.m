@@ -9,6 +9,14 @@ num_states_subsys = prod([network.nodes(subsystem).num_states]);
 
 op_single = network.options(12);     % just needed for console output
 op_console = network.options(8);   %(1: display the results, 0: not)
+op_extNodes = network.options(11);
+
+if op_extNodes == 0
+    extNodes = setdiff(network.full_system, subsystem);
+else
+    extNodes = [];
+end 
+
 %% numerator data
 % ???This is where we build subsets_subsys of purviews (power-set exclude empty
 % set)
@@ -58,7 +66,7 @@ for ci=1: num_states_subsys-1  % loop over purview subsets_subsys
     else
         phi_all_values(ci,:) = [0 0 0];
         uniform_dist = ones(num_states_subsys,1)/num_states_subsys;
-        forward_maxent_dist = comp_pers_cpt(network.nodes,[],subsystem,[],'forward');
+        forward_maxent_dist = comp_pers_cpt(network.nodes,[],subsystem,whole_sys_state,'forward', extNodes);
         prob{ci} = {uniform_dist, forward_maxent_dist(:)}; 
         prob_prod{ci} = {uniform_dist, forward_maxent_dist(:)}; 
         MIP{ci} = cell(2,2,2); % should we change these to uniform, full sys... etc

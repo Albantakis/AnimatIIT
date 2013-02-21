@@ -80,6 +80,7 @@ Rem_network.tpm = new_tpm;
 Rem_network.full_system = subsys_nodes;
 Rem_network.num_subsets = 2^Nsub;
 Rem_network.current_state = network.current_state(this_subset);
+Rem_network.past_state = [];
 Rem_network.num_states = prod([Rem_network.nodes(subsys_nodes).num_states]);
 Rem_network.noise = network.noise;
 Rem_network.b_table = network.b_table(1:2^Nsub,1:Nsub); %just used in phi_comp_ex_unidir, better replace by set of subsets
