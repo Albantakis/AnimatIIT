@@ -103,7 +103,10 @@ elseif strcmp(bf_option,'forward')
     denom_conditional_joint = ones(denom_conditional_joint_size);
     denom_inputs = [];
     for i = 1:length(denom_nodes)
-        denom_inputs = union(denom_inputs,denom_nodes(i).input_nodes);
+        %denom_inputs = union(denom_inputs,denom_nodes(i).input_nodes);
+        %denom_inputs = unique([denom_inputs denom_nodes(i).input_nodes]);
+        denom_inputs = sort([denom_inputs denom_nodes(i).input_nodes]);
+        denom_inputs(denom_inputs((1:end-1)') == denom_inputs((2:end)')) = [];  % faster inline implementation of unique
     end
       
     conditioning_indices = cell(1,2*num_sys_nodes);

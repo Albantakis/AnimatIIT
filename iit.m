@@ -360,7 +360,9 @@ if op_extNodes == 0
     % Larissa: Check if past_state could be past state of present state!!
     past_state = get(handles.past_state,'Data');
     past_index = state2index(past_state,2.*ones(size(past_state)));
-    state_reachable = isequal(logical(tpm(past_index,:)), logical(current_state)');
+    pot_current = tpm(past_index,:);
+    determined_elements = sort(setxor(find(pot_current), find(pot_current-1))); %So that it works for noise, too
+    state_reachable = isequal(logical(pot_current(determined_elements)), logical(current_state(determined_elements))');
     
     if state_reachable == 0
         set(handles.warning,'String','Current and past state are not congruent!');

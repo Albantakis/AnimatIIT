@@ -174,12 +174,13 @@ if any(strcmp(view_option,{'3D','2D3D'}))
             color = [1, 0, 0];
         end   
         scatter3(ax{ax_index},part(l,state_ordering(1)),part(l,state_ordering(2)),...
-            part(l,state_ordering(3)),'Marker','d','MarkerEdgeColor',color,'SizeData',75,'Clipping','on')
+            part(l,state_ordering(3)),'Marker','d','MarkerEdgeColor',color,'SizeData',75*all_phi(2,l)*4,'Clipping','on')
         hold on
     end
-    scatter3(ax{ax_index},whole(:,state_ordering(1)),whole(:,state_ordering(2)),...
-        whole(:,state_ordering(3)),'Marker','*','MarkerEdgeColor','b','SizeData',75,'Clipping','on')
-
+    for l = 1:nWholeConcepts
+        scatter3(ax{ax_index},whole(l,state_ordering(1)),whole(l,state_ordering(2)),...
+            whole(l,state_ordering(3)),'Marker','*','MarkerEdgeColor','b','SizeData',75*all_phi(1,l)*4,'Clipping','on')
+    end
     hold on
 
     scatter3(ax{ax_index},whole(w_highlight_indices,state_ordering(1)),whole(w_highlight_indices,state_ordering(2)),...

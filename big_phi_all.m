@@ -4,6 +4,7 @@ op_console = network.options(8);
 op_parfor = network.options(9); % used by Animat program
 op_strongconn = network.options(10);
 op_extNodes = network.options(11);
+op_complex = network.options(3);
 
 N = network.num_nodes; % number of elements in the whole system
 nodes_vec = network.full_system;
@@ -27,7 +28,7 @@ M_IRR_M = cell(network.num_states-1,1);
 removal_networks = cell(network.num_states-1,1); 
 MIP_M_subsys = cell(network.num_states-1,1); % only used for removals
 
-if op_parfor == 2 && op_extNodes == 0
+if op_parfor == 2 && op_extNodes == 0 && op_complex == 1
     network.BRs = cell(network.num_states-1,1); % backward repertoire
     network.FRs = cell(network.num_states-1,1); % forward repertoire
     for i = 1:network.num_states-1

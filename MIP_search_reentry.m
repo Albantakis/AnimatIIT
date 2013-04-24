@@ -133,8 +133,8 @@ for j = 1:N_Bp
                     BRcut_phi(k) = phi_BRcut;
                     FRcut_phi(k) = phi_FRcut;
                     %Larissa: These have to be there. Maybe there is a more efficient way though
-                    BRcut_dist(k,1,:) = {prob_M{whole_i,1}{concept_numind(k)}{1} prob_M{whole_i,1}{concept_numind(k)}{1}}; %back is the same
-                    FRcut_dist(k,2,:) = {prob_M{whole_i,1}{concept_numind(k)}{2} prob_M{whole_i,1}{concept_numind(k)}{2}}; %back might have changed, future is the same
+                    BRcut_dist(k,1,:) = {prob_M{whole_i,1}{concept_numind(k)}{1} prob_M{whole_i,1}{concept_numind(k)}{1}}; 
+                    FRcut_dist(k,2,:) = {prob_M{whole_i,1}{concept_numind(k)}{2} prob_M{whole_i,1}{concept_numind(k)}{2}};
             end 
              
         else % if numerator has elements from both sides
@@ -257,41 +257,25 @@ for j = 1:N_Bp
         forward_maxent = comp_pers_cpt(network.nodes,[],M,network.current_state,'forward',extNodes);
         forward_maxent = forward_maxent(:);
         
-%             indBR = find(BRcut_phi);
-%             indFR = find(FRcut_phi);
-%             BRcut_phi = BRcut_phi(indBR);
-%             FRcut_phi = FRcut_phi(indFR);
-%             BRcut_concepts = [BRcut_phi sum(phi_w_concepts)-sum(BRcut_phi)];
-%             
-%             BRDistMat_past = EMDDistanceMatrix(BRcut_dist(:,1,1), BRcut_dist(indBR,1,2), back_maxent); %past whole and cut distributions
-%             BRDistMat_fut = EMDDistanceMatrix(BRcut_dist(:,2,1), BRcut_dist(indFR,2,2), forward_maxent); %future whole and cut distributions
-        TempMp = genEMDDistanceMatrix(BRcut_dist(:,1,1), BRcut_dist(:,1,2), back_maxent); %past whole and cut distributions
-        BRDistMat_past = [zeros(size(TempMp)), TempMp; TempMp' zeros(size(TempMp))];
-        TempMf = genEMDDistanceMatrix(BRcut_dist(:,2,1), BRcut_dist(:,2,2), forward_maxent); %future whole and cut distributions
-        BRDistMat_fut = [zeros(size(TempMf)), TempMf; TempMf' zeros(size(TempMf))];
-
         BRphiDiff = sum(phi_w_concepts)-sum(BRcut_phi);
         tempVphi = [phi_w_concepts'; 0];
         tempVphicut = [BRcut_phi; BRphiDiff];
-        BRcut_Phi(1) = emd_hat_gd_metric_mex([tempVphi; zeros(size(tempVphi))],[zeros(size(tempVphicut));tempVphicut],BRDistMat_past);
-        BRcut_Phi(2) = emd_hat_gd_metric_mex([tempVphi; zeros(size(tempVphi))],[zeros(size(tempVphicut));tempVphicut],BRDistMat_fut);
-        %BRcut_Phi
-        BRcut_Phi = sum(BRcut_Phi); 
-
-
-        TempMp = genEMDDistanceMatrix(FRcut_dist(:,1,1), FRcut_dist(:,1,2), back_maxent); %past whole and cut distributions
-        FRDistMat_past = [zeros(size(TempMp)), TempMp; TempMp' zeros(size(TempMp))];
-        TempMf = genEMDDistanceMatrix(FRcut_dist(:,2,1), FRcut_dist(:,2,2), forward_maxent); %future whole and cut distributions
-        FRDistMat_fut = [zeros(size(TempMf)), TempMf; TempMf' zeros(size(TempMf))];
-
+        
+        [DistMat, indD] = genEMDDistanceMatrix(BRcut_dist, [back_maxent,forward_maxent],network.gen_dist_matrix); %past whole and cut distributions      
+        Vphi = tempVphi(indD);
+        Vphicut = tempVphicut(indD);
+        %This has to be so complicated, because the emd function gives 0
+        %if phi and phicut have the same value. Even if there is a distance
+        %for the two of them.
+        BRcut_Phi = emd_hat_gd_metric_mex([Vphi; zeros(size(Vphicut))],[zeros(size(Vphi));Vphicut],[zeros(size(DistMat)), DistMat; DistMat' zeros(size(DistMat))]);
+        
+        [DistMat, indD] = genEMDDistanceMatrix(FRcut_dist, [back_maxent,forward_maxent],network.gen_dist_matrix); %past whole and cut distributions
         FRphiDiff = sum(phi_w_concepts)-sum(FRcut_phi);
-
         tempVphicut = [FRcut_phi; FRphiDiff];
-        FRcut_Phi(1) = emd_hat_gd_metric_mex([tempVphi; zeros(size(tempVphi))],[zeros(size(tempVphicut));tempVphicut],FRDistMat_past);
-        FRcut_Phi(2) = emd_hat_gd_metric_mex([tempVphi; zeros(size(tempVphi))],[zeros(size(tempVphicut));tempVphicut],FRDistMat_fut);
-        %FRcut_Phi
-        FRcut_Phi = sum(FRcut_Phi); 
-
+        Vphi = tempVphi(indD);
+        Vphicut = tempVphicut(indD);
+        FRcut_Phi = emd_hat_gd_metric_mex([Vphi; zeros(size(Vphicut))],[zeros(size(Vphi));Vphicut],[zeros(size(DistMat)), DistMat; DistMat' zeros(size(DistMat))]);
+        
         [d_Big_phi, indexCut] = min([BRcut_Phi, FRcut_Phi]);
         
     elseif op_big_phi == 3

@@ -1,16 +1,17 @@
-function [phi_MIP prob prob_prod_MIP MIP network] = phi_comp_bf(subsystem,numerator,denom_past,denom_future,whole_sys_state,network)
+function [phi_MIP, prob, prob_prod_MIP, MIP, network] = phi_comp_bf(subsystem,numerator,denom_past,denom_future,whole_sys_state,network)
 % compute small phi of a given purview...?
 
 op_normalize = network.options(6);
 op_small_phi = network.options(4);
 op_parfor = network.options(9);
 op_extNodes = network.options(11);
+op_complex = network.options(3);
 
 num_nodes_denom_past = length(denom_past);
 num_nodes_numerator = length(numerator);
 num_nodes_denom_future = length(denom_future);
 
-if op_parfor == 2 && op_extNodes == 0
+if op_parfor == 2 && op_extNodes == 0 && op_complex == 1
     BRs = network.BRs{subsystem2index(subsystem)};
     FRs = network.FRs{subsystem2index(subsystem)};
 else    
@@ -116,7 +117,8 @@ for i = 1:num_denom_partitions % past or future
                 elseif op_small_phi == 1
                     phi = L1norm(prob{bf},prob_p); 
                 elseif op_small_phi == 2
-                    phi = emd_hat_gd_metric_mex(prob{bf},prob_p,gen_dist_matrix(length(prob_p)));                  
+                    %phi = emd_hat_gd_metric_mex(prob{bf},prob_p,gen_dist_matrix(length(prob_p)));                  
+                    phi = emd_hat_gd_metric_mex(prob{bf},prob_p,network.gen_dist_matrix(1:length(prob_p),1:length(prob_p)));                  
                 end
                 
             else
@@ -160,19 +162,6 @@ else
 end
 end
 
-
-
-function Norm = Normalization(denom_part1,denom_part2,numerator_part1,numerator_part2,xf_1,xf_2)
-
-if nargin == 4
-    Norm = min(length(numerator_part1),length(denom_part2)) + min(length(numerator_part2),length(denom_part1));
-else %Larissa: this is outdated
-    Norm = min(length(numerator_part1),length(denom_part2)) + min(length(numerator_part2),length(denom_part1)) ...
-        + min(length(numerator_part1),length(xf_2)) + min(length(numerator_part2),length(xf_1));
-end
-
-end
-
 function [X_min i_min j_min k_min] = min3(X,X2,op_normalize)
 X_min = Inf; % minimum of normalized phi (or unnormalized if op_normalize == 0)
 X_min2 = Inf; % minimum of phi
@@ -212,7 +201,7 @@ end
 end
 
 
-function [phi_min_choice i_min j_min] = min2(phi,phi_norm,op_normalize)
+function [phi_min_choice, i_min, j_min] = min2(phi,phi_norm,op_normalize)
 phi_norm_min = Inf; % minimum of normalized phi
 phi_min = Inf; % minimum of phi
 i_min = 1;
