@@ -29,12 +29,21 @@ InStates_distrO2 = hist(inMapO2, 1:size(InStatesO2,1))';
 p_InStatesO2 = InStates_distrO2./size(Input_O2,1);
 
 %% Internal state distribution
-Life_tpm = Life_tpm.data(:,10:17);
-Life_tpm = Life_tpm(:,Elements); %reduced logic table
-Life_tpm(:,Elements < numSen+1) = 0; %LA: For the moment but check later, maybe they are already anyways. Just to be safe
+% Life_tpm = Life_tpm.data(:,10:17);
+% Life_tpm = Life_tpm(:,Elements); %reduced logic table
+% Life_tpm(:,Elements < numSen+1) = 0; %LA: For the moment but check later, maybe they are already anyways. Just to be safe
+% [LifeStates, redR, redMap] = unique(Life_tpm, 'rows', 'First');
+
+% Given freezing we also need to know the past system state
+%Larissa: Replace 9 with max_nodes+1
+max_nodes = 8;
+Life_tpm = Life_tpm.data(:,[Elements,max_nodes+1+Elements]);
+%Life_tpm = Life_tpm(:,Elements); %reduced logic table
+Life_tpm(:,logical([zeros(size(Elements)), Elements < numSen+1])) = 0; %LA: For the moment but check later, maybe they are already anyways. Just to be safe
 [LifeStates, redR, redMap] = unique(Life_tpm, 'rows', 'First');
 
-LifeStates_distr = hist(redMap, 1:size(LifeStates,1))'; %Larissa Check if number in hist fits with LifeState Ordering!!!
+
+LifeStates_distr = hist(redMap, 1:size(LifeStates,1))'; 
 p_LifeStates = LifeStates_distr./size(Life_tpm,1);
 
 %B = redLogic(sortind,:); This is the correct ordering of input states

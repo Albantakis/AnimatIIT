@@ -6,8 +6,8 @@ numSen = 2;
 numMot = 2;
 numNodes = 8;
 % -------------------------------------------------------------------------
-TrialNum = 9;
-TrialType = 'c1a3_24';
+TrialNum =9;
+TrialType = 'c35a271_36';
 AnimatPath = strcat('~/Documents/Arend_XCodeAnimat/temporalSpatialIntegrationLite/work_', TrialType , '/trial', int2str(TrialNum),'_');
 % -------------------------------------------------------------------------
 %% options for one state and KLD and sum of small phis
@@ -16,15 +16,17 @@ AnimatPath = strcat('~/Documents/Arend_XCodeAnimat/temporalSpatialIntegrationLit
 %in_options = [0     1     1     0     0     1     1     0     0     3     1     2     1     0     0     1     1     0];
 %all states L1 and L1 norm for complexes
 %in_options = [0     1     1     1     1     1     1     0     2     0     0     1     1     0     0     1     1     0];
-%all states EMD and L1 norm for constellations only (9: parfor,10:strongconn, 11:removal)
-in_options =  [0     1     1     2     1     1     1     0     1     0     1     1     1     0     0     1     1     0];
+%all states EMD and L1 norm for constellations only (9: parfor,10:strongconn, 11:freeze)
+in_options =  [0     1     0     2     2     1     1     0     1     0     0     1     1     0     0     1     1     0];
+
+
+   
 %Larissa: TODO check this and options in general!
 op_average = in_options(2); % 0: use a specific current state 1: average over all possible current states
 op_write = 2; % 1 --> write output to file
-op_removal = in_options(11);
 
 if op_write > 0
-    Foldername = strcat('Noise_', TrialType,'_trial', int2str(TrialNum));
+    Foldername = strcat('Freeze_', TrialType,'_trial', int2str(TrialNum));
     mkdir(Foldername)
 end 
 
@@ -44,7 +46,7 @@ tic
 fprintf('\nRunning...\n\n')
 
 %% for loop across generations
-for g = 0:16:30000-1
+for g = [56320       56832       57344];%[30208:512:60000-1 59984];
     results = [];
     
     Animat_gen = g;
@@ -59,6 +61,7 @@ for g = 0:16:30000-1
         J_temp = J_temp(J_temp(:,1) <= numNodes-numMot,:); 
         %Sensors might have incoming connection, but because they actually don't do anything they shouldn't be taken into account
         J_temp = J_temp(J_temp(:,2) > numSen,:);
+        
         J_sparse = sparse(J_temp(:,1), J_temp(:,2),1,numNodes,numNodes);
             
         J = full(J_sparse)';     
@@ -69,12 +72,11 @@ for g = 0:16:30000-1
 
         
         J = J(used_nodes, used_nodes);
-        
         if ~isempty(J)
             % NODES WITH ONLY OUTPUTS are set to 0 in animat program -> they shouldn't be
             % marginalized -> take them out of TPM
             % STRATEGY: leave motors in TPM but always use 00 state for them
-
+            results.numConn = nnz(J);
             in_connect_mat = J;
             results.connect_mat = J;
             results.used_nodes = used_nodes-1;
@@ -85,14 +87,16 @@ for g = 0:16:30000-1
                 current_state = [0.5 0 1 0]';
                 state_max = 1;
             else
-                [LifeStates, p_LifeStates] = Animat_LifeStateListSmall(Animat_gen, used_nodes, AnimatPath, numSen);
+                [LifeTransitions, p_LifeTransitions] = Animat_LifeStateListSmall(Animat_gen, used_nodes, AnimatPath, numSen);
+                PastStates = LifeTransitions(:,1:numel(used_nodes));
+                LifeStates = LifeTransitions(:,(numel(used_nodes)+1):2*numel(used_nodes));
                 LifeState_index = zeros(1,size(LifeStates,1));
                 %state_max = size(LifeStates, 1);
                 for i = 1:size(LifeStates,1)
                     LifeState_index(i) = state2index(LifeStates(i,:),2.*ones(length(used_nodes),1));
                 end    
                 results.LifeState_index = LifeState_index;    
-                results.p_LifeStates = p_LifeStates;
+                results.p_LifeTransitions = p_LifeTransitions;
             end
 
     %% new way of input with nodes
@@ -143,13 +147,13 @@ for g = 0:16:30000-1
             network.full_system = 1:num_nodes;
             network.num_subsets = 2^num_nodes;
             network.noise = 0;
+            network.num_states = prod([network.nodes(network.full_system).num_states]);
             % Larissa: check, cause we should use lifestates, but maybe all network
             % states is actually needed some time later
-            network.num_states = prod([network.nodes(network.full_system).num_states]);
-            network.states = zeros(network.num_nodes,network.num_states);
-            for i = 0:network.num_states - 1
-                network.states(:,i+1) = dec2multibase(i,[network.nodes(network.full_system).num_states]);
-            end
+%             network.states = zeros(network.num_nodes,network.num_states);
+%             for i = 0:network.num_states - 1
+%                 network.states(:,i+1) = dec2multibase(i,[network.nodes(network.full_system).num_states]);
+%             end
 
             % Larissa: I don't think this changes, so can be put here for all
             % states
@@ -163,13 +167,15 @@ for g = 0:16:30000-1
             end
 
             if op_average ~= 0
-                state_max = network.num_states;
+                %state_max = network.num_states;
+                state_max = numel(LifeState_index);
             end    
             % init cell arrays for results - OLD WAY
             Big_phi_M_st = cell(state_max,1);
             Big_phi_MIP_st = cell(state_max,1);
             MIP_st = cell(state_max,1);
             Complex_st = cell(state_max,1);
+            BFCut_st = cell(state_max,1);
             prob_M_st = cell(state_max,1);
             phi_M_st = cell(state_max,1);
             concept_MIP_M_st = cell(state_max,1);
@@ -180,15 +186,16 @@ for g = 0:16:30000-1
 
             % find main complex (do system partitions)
             op_complex = network.options(3);
-            %% main loop over states
+            %% main loop over life states
             for z = 1:state_max
                 if op_average == 1
-                    current_state = network.states(:,z);
-                    %current_state = LifeStates(z, :)';
+                    %current_state = network.states(:,z);
+                    current_state = LifeStates(z, :)';
+                    past_state = PastStates(z,:)';
                 end
                 this_state = current_state;
                 network.current_state = current_state;
-
+                network.past_state = past_state;
                 % init backward rep and forward reps for each state
                 network.BRs = cell(network.num_subsets); % backward repertoire
                 network.FRs = cell(network.num_subsets); % forward repertoire
@@ -200,7 +207,7 @@ for g = 0:16:30000-1
                 check_prob = partial_prob_comp(network.full_system,network.full_system,this_state,tpm,network.b_table,1); % last argument is op_fb = 1;
                 state_reachable = sum(check_prob);
 
-                if ~state_reachable || ~ismember(z, LifeState_index)
+                if ~state_reachable %|| ~ismember(z, LifeState_index)   %Shouldn't happen!
 
                     %fprintf('\tThis state cannot be realized...\n')
 
@@ -210,29 +217,30 @@ for g = 0:16:30000-1
                     % SET OTHERS
 
                 else
-
-                    %fprintf('\tComputing state...\n')
-
                     % only consider whole system
                     % THIS OPTION NEEDS TO BE WORKED OUT!
                     if op_complex == 0 
 
             %             [BRs FRs] = comp_pers(this_state,tpm,b_table,options);
             %             (network.full_system,this_state,tpm,network.b_table,network.options)
-                        [Big_phi phi prob_cell MIPs M_IRR network] = big_phi_comp_fb(network.full_system,this_state,network);
-                        Big_phi_M_st{z} = Big_phi;
-
-                        % TODO: WE NEED TO HANDLE MIP IN THIS CASE EVEN WE DON'T FIND
-                        % THE COMPLEX
-
+                        % [Big_phi phi prob_cell MIPs M_IRR network] = big_phi_comp_fb(network.full_system,this_state,network);
+                        % Big_phi_M_st{z} = Big_phi;
+                        [Big_phi_M phi_M prob_cell concept_MIP_M purviews_M] = big_phi_comp_fb(network.full_system,this_state,network);
+                        
+                        Complex_st{z} = network.full_system;
+                        
+                        if op_write == 2
+                            results.state(z) = Animat_rewrap_ZombieData(network.full_system, Big_phi_M, phi_M, concept_MIP_M, purviews_M);
+                        end        
                     % find the complex
                     elseif op_complex == 1
 
                         [Big_phi_M phi_M prob_M M_cell concept_MIP_M purviews_M network concept_MIP_M_subs] = big_phi_all(network, this_state);                                             
                         % complex search
-                        [Big_phi_MIP MIP Complex M_i_max  Big_phi_MIP_M complex_MIP_M Big_phi_MIP_all_M complex_MIP_M_all BFCut_M] = ...
+                        [Big_phi_MIP MIP Complex M_i_max BFCut Big_phi_MIP_M complex_MIP_M Big_phi_MIP_all_M complex_MIP_M_all BFCut_M] = ...
                             complex_search(Big_phi_M,M_cell, purviews_M, network.num_nodes,prob_M,phi_M,network.options,concept_MIP_M,network);
-
+    
+        
                         Big_phi_M_st{z} = Big_phi_M;
                         Big_phi_MIP_st{z} = Big_phi_MIP_M;
                         % it looks like MIP is never  used
@@ -240,22 +248,8 @@ for g = 0:16:30000-1
                         Complex_st{z} = Complex;
                         prob_M_st{z} = prob_M;
                         phi_M_st{z} = phi_M;
-
-
-                        % For removals, the concepts don't yet have the right node
-                        % names
-                        if op_removal == 0
-                           for i = 1:size(Big_phi_M,1)-1 %all except full system
-                               if ~isempty(network.removal_networks{i})
-                                    this_subset = network.removal_networks{i}.this_subset;
-                                    for j = 1:size(purviews_M{i},1)
-                                        purviews_M{i}{j} = this_subset(purviews_M{i}{j});
-                                    end    
-                                end
-                           end
-                           concept_MIP_M = {concept_MIP_M_subs{1:end-1} concept_MIP_M{end}};
-                         end    
-
+                        BFCut_st{z} = BFCut; %M1->M2 noised, or M1<-M2
+                        
                         concept_MIP_M_st{z} = concept_MIP_M;
                         complex_MIP_M_st{z} = complex_MIP_M;
                         Big_phi_MIP_all_M_st{z} = Big_phi_MIP_all_M;
@@ -266,8 +260,8 @@ for g = 0:16:30000-1
                             results.state(z) = rewrap_data(Big_phi_M, phi_M, prob_M, M_cell, concept_MIP_M, purviews_M,...
                                     Big_phi_MIP, MIP, Complex, M_i_max,  Big_phi_MIP_M, complex_MIP_M, Big_phi_MIP_all_M, complex_MIP_M_all);
                         elseif op_write == 2
-                            results.state(z) = rewrap_data_short(Big_phi_M, phi_M, prob_M, M_cell, concept_MIP_M, purviews_M,...
-                                    Big_phi_MIP, MIP, Complex, M_i_max);
+                            results.state(z) = Animat_rewrap_data_short(Big_phi_M, phi_M, prob_M, M_cell, concept_MIP_M, purviews_M,...
+                                    Big_phi_MIP, MIP, Complex, M_i_max, BFCut);
                         end    
                     end
                 end
@@ -302,6 +296,7 @@ for g = 0:16:30000-1
         end
 
         results.Complex = Complex_st;
+        results.options = in_options;
 
         %% finish & cleanup: stop timer, save data, open explorer gui, close matlabpool
         toc
@@ -315,7 +310,11 @@ for g = 0:16:30000-1
            cd ..
         elseif op_write == 2
            cd(Foldername)
-           StateFilename = strcat('Animat_gen', int2str(Animat_gen),'_ShortResults');
+           if op_complex == 0
+               StateFilename = strcat('Animat_gen', int2str(Animat_gen),'_Zombie');
+           elseif op_complex == 1
+               StateFilename = strcat('Animat_gen', int2str(Animat_gen),'_ShortResults');
+           end
            save(StateFilename, 'results');
            cd ..
         end  
